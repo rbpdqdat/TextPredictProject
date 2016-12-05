@@ -1,6 +1,7 @@
+rm(list=ls())
 library(ggplot2)
 library(scales)
-rm(list=ls())
+
 
 loadGrams <- function(i,j) {
   newDir <- paste(c("SwiftKey/en_US/en_US_sample_",i,"_percent/"),collapse='')
@@ -35,7 +36,8 @@ for (k in percent) {
   )))
 }
 
-nGramPlot(df1,1)
+nGramPlot(df10,10)
+
 
 ngramTot <- function(gram) sum(gram,na.rm=TRUE)
 cols <- c("unigram" = "red","bigram" = "blue","trigram" = "green",
@@ -61,4 +63,5 @@ nGramPlot <- function(df,pcnt) {
                                              "quadgram","pentigram"))
      p <- p + scale_x_continuous(labels = comma)
      p
+     ggsave(filename = paste(c("ngram_plot_",pcnt,"_percent_data.png"),collapse=''))
 }
