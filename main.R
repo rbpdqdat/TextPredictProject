@@ -17,7 +17,7 @@ summaryRprof(tmp)
 # (Rda tables:unigram + bigram+trigram + quad + pent= 8 MB)
 # Could increase the percentages if only looking at one file, such as twitter by itself
 # Different percentages will be kept in separate folders
-percent <- 0.05
+percent <- 0.1
 #write files to directories so you won't need to do this again
 newdir <- paste(c("SwiftKey/en_US/en_US_sample_",percent * 100,"_percent/"),collapse='')
 dir.create(newdir)  
@@ -48,14 +48,7 @@ df <- data.frame(matrix(unlist(cleanData), nrow=length(unlist(cleanData)), byrow
 rm(cleanData)
 splits <- dataTrainValTest(df,'')
 rm(df)
-#I need to understand how this is organizing the data
-#the R 'lists' are driving me crazy
-#str(splits)
-#lapply(splits,nrow)
-#lapply(splits,head)
-#splits$trainset2
-#Rprof()
-#summaryRprof(tmp)
+
 corpus <- Corpus(VectorSource(list(splits$trainset2)))
 Rprof(tmp <- tempfile())
 source("nGrams.R")
@@ -69,20 +62,12 @@ g('quadgram')
 g('pentigram')
 
 #rm(oneGramTable,twoGramTable)
-oneGramTable <- loadGrams('unigram',1)
-twoGramTable <- loadGrams('bigram',2)
-threeGramTable <- loadGrams('trigram',3)
+oneGramTable <- GoodTuringDiscount(loadNGrams('unigram',1))
+twoGramTable <- GoodTuringDiscount(loadNGrams('bigram',2))
+threeGramTable <- GoodTuringDiscount(loadNGrams('trigram',3))
+fourGramTable <- GoodTuringDiscount(loadNGrams('quadgram',4))
 
-oneGramTable <- createGramTableExtended(oneGramTable)
-head(oneGramTable)
-tail(oneGramTable)
-object.size(oneGramTable) / 1024^2
-twoGramTable <- createGramTableExtended(twoGramTable)
-head(twoGramTable)
-tail(twoGramTable)
-object.size(twoGramTable) / 1024^2
-threeGramTable <- createGramTableExtended(threeGramTable)
-head(threeGramTable)
-tail(threeGramTable)
-object.size(threeGramTable) / 1024^2
-
+oneGramTable <- MLE(oneGramTable)
+twoGramTable <- MLE(twoGramTable)
+threeGramTable <- MLE(threeGramTable)
+fourGramTable <- MLE(fourGramTable)

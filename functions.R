@@ -6,6 +6,7 @@ library(ggplot2)
 library(R.utils)
 library(hunspell)
 library(caret)
+library(data.table)
 
 loadFile <- function(fileName) { 
   bcon <- file(fileName, open='rb')
@@ -184,7 +185,7 @@ nGram <- function(mn,mx,gram,corp,corpName,y) {
 }
 
 #loading the gram tables
-loadGrams <- function(rDataB,spltNum) { 
+loadNGrams <- function(rDataB,spltNum) { 
   gramFile <- paste(c(newdir,"train.",rDataB,".Rda"),collapse='')
   load(gramFile)
   row.names(wf) <- NULL
@@ -205,6 +206,22 @@ loadGrams <- function(rDataB,spltNum) {
      wf$lastTerm <- lapply(as.character(wf$Token), 
                       function(x) {strsplit(x," ")[[1]][3]})
      }
+    if (spltNum == 4) { 
+      wf$firstTerms <- lapply(as.character(wf$Token), 
+                              function(x) {paste(strsplit(x," ")[[1]][1],strsplit(x," ")[[1]][2],
+                                                 strsplit(x," ")[[1]][3],sep="_")}
+      )
+      wf$lastTerm <- lapply(as.character(wf$Token), 
+                            function(x) {strsplit(x," ")[[1]][4]})
+    }
+    if (spltNum == 5) { 
+      wf$firstTerms <- lapply(as.character(wf$Token), 
+                              function(x) {paste(strsplit(x," ")[[1]][1],strsplit(x," ")[[1]][2],
+                                                 strsplit(x," ")[[1]][3],strsplit(x," ")[[1]][4],sep="_")}
+      )
+      wf$lastTerm <- lapply(as.character(wf$Token), 
+                            function(x) {strsplit(x," ")[[1]][5]})
+    }
      #remove word column
      #wf[,Token:=NULL]
      wf$Token <-  NULL
@@ -222,26 +239,41 @@ loadGrams <- function(rDataB,spltNum) {
   return(setDT(wf))
 }
 
-createGramTableExtended = function(GramTable){
-  # Supposed table "oneGramTable" as above, we want to add a "discount" column.
+#creating a maximum likelihood estimator column
+MLE <- function(GramTable) {
+  GramTable <- head(threeGramTable)
+  GramTable$MLE = rep(1, nrow(GramTable))
+  GramTable$MLE <- apply(GramTable[,by = c("frequency","firstTerms","lastTerm"),drop=F], 1,
+    function(x) {
+     termMatch <- GramTable[lastTerm == x[3]]
+     strtoi(x[1], base = 0L)/sum(termMatch$frequency)
+   })
+  return(GramTable)
+}
+
+#Good-Turing Discount function
+#This needs some work
+GoodTuringDiscount <- function(GramTable){
+  GramTable$gtAdjFreq = GramTable$frequency
   GramTable$discount = rep(1, nrow(GramTable))
+  # We only consider n-grams that have 0 < frequency <= k (5). 
+  # or small values of r it is reasonable to set S(N_{r})=N_{r}} S(N_r) = N_r 
+  #(that is, no smoothing is performed), while for large values of r, 
+  #values of  S(N_{r})} S(N_r) are read off the regression line
+  #https://en.wikipedia.org/wiki/Good%E2%80%93Turing_frequency_estimation#cite_note-8
   
-  # Calculate the discount coefficient.
-  # We only consider n-grams that have 0 < frequency <= k (5). Larger than 5: "Reliable enough".
-  for (j in 5:1) {
-    currRTimes = j 
-    nextRTimes = currRTimes + 1
-    currN = nrow(GramTable[frequency == currRTimes])
-    nextN = nrow(GramTable[frequency == nextRTimes])
-    currd = (nextRTimes / currRTimes) * (nextN / currN) # assumption: 0 < d < 1
-    # the beauty of "data.table"!
-    GramTable[frequency == currRTimes, discount := currd]
+  #https://west.uni-koblenz.de/sites/default/files/BachelorArbeit_MartinKoerner.pdf
+  #Chen and Goodman
+  #[CG98] argue that the Good-Turing estimate does not perform well, since higher
+  #level models are not combined with lower level models during the calculation
+  for (r in 5:1) {
+    N = nrow(GramTable[frequency == r])
+    Nplus = nrow(GramTable[frequency == r + 1])
+    adjCt = (r + 1) * Nplus/N
+    dcount = adjCt/N
+    GramTable[frequency == r, gtAdjFreq := adjCt]
+    GramTable[frequency == r, discount := dcount]
   }
-  
-  # Calculate the remaining probability (thanks to discounting...).
-  #oneGramTable_leftOverProb = oneGramTable[, .(leftoverprob=calcLeftOverProb(lastTerm, frequency, discount)), by=firstTerms]  
-  # We now have one important objects: oneGramTable, oneGramTable_leftOverProb
-  # ...
   return(GramTable)
 }
 

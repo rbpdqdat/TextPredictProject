@@ -2,7 +2,6 @@ rm(list=ls())
 library(ggplot2)
 library(scales)
 
-
 loadGrams <- function(i,j) {
   newDir <- paste(c("SwiftKey/en_US/en_US_sample_",i,"_percent/"),collapse='')
   gramFile <- paste(c(newDir,"train.",j,".Rda"),collapse='')
@@ -36,8 +35,7 @@ for (k in percent) {
   )))
 }
 
-nGramPlot(df10,10)
-
+nGramPlot(df5,5)
 
 ngramTot <- function(gram) sum(gram,na.rm=TRUE)
 cols <- c("unigram" = "red","bigram" = "blue","trigram" = "green",
