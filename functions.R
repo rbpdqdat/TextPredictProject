@@ -253,7 +253,7 @@ MLE <- function(GramTable) {
 #Good-Turing Discount function
 #This needs some work
 GoodTuringDiscount <- function(GramTable){
-  GramTable$gtAdjFreq = GramTable$frequency
+  #GramTable$gtAdjFreq = GramTable$frequency
   GramTable$discount = rep(1, nrow(GramTable))
   # We only consider n-grams that have 0 < frequency <= k (5). 
   # or small values of r it is reasonable to set S(N_{r})=N_{r}} S(N_r) = N_r 
@@ -270,7 +270,7 @@ GoodTuringDiscount <- function(GramTable){
     Nplus = nrow(GramTable[frequency == r + 1])
     adjCt = (r + 1) * Nplus/N
     dcount = adjCt/N
-    GramTable[frequency == r, gtAdjFreq := adjCt]
+    #GramTable[frequency == r, gtAdjFreq := adjCt]
     GramTable[frequency == r, discount := dcount]
   }
   return(GramTable)

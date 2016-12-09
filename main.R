@@ -62,12 +62,22 @@ g('quadgram')
 g('pentigram')
 
 #rm(oneGramTable,twoGramTable)
+#look into unigram table, a lof of NA's beging returned
 oneGramTable <- GoodTuringDiscount(loadNGrams('unigram',1))
 twoGramTable <- GoodTuringDiscount(loadNGrams('bigram',2))
 threeGramTable <- GoodTuringDiscount(loadNGrams('trigram',3))
 fourGramTable <- GoodTuringDiscount(loadNGrams('quadgram',4))
 
-oneGramTable <- MLE(oneGramTable)
+fourGramTable[order(fourGramTable$firstTerms)]
+fourGramTable_leftOverProb <- fourGramTable[, .(leftoverprob=calcLeftOverProb(lastTerm, frequency, discount)), by=firstTerms] 
+threeGramTable[order(threeGramTable$firstTerms)]
+threeGramTable_leftOverProb <- threeGramTable[, .(leftoverprob=calcLeftOverProb(lastTerm, frequency, discount)), by=firstTerms]
+twoGramTable[order(twoGramTable$firstTerms)]
+twoGramTable_leftOverProb <- twoGramTable[, .(leftoverprob=calcLeftOverProb(lastTerm, frequency, discount)), by=firstTerms]
+
+#oneGramTable <- MLE(oneGramTable)
 twoGramTable <- MLE(twoGramTable)
 threeGramTable <- MLE(threeGramTable)
 fourGramTable <- MLE(fourGramTable)
+head(fourGramTable,100)
+
