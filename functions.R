@@ -241,7 +241,6 @@ loadNGrams <- function(rDataB,spltNum) {
 
 #creating a maximum likelihood estimator column
 MLE <- function(GramTable) {
-  GramTable <- head(threeGramTable)
   GramTable$MLE = rep(1, nrow(GramTable))
   GramTable$MLE <- apply(GramTable[,by = c("frequency","firstTerms","lastTerm"),drop=F], 1,
     function(x) {

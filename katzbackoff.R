@@ -107,63 +107,82 @@ getTerms = function(inputString, num){
   paste(tempWords, collapse="_")
 }
 
-
+katzPredict2('and a case of')
 
 katzPredict2 = function(inputString){
   # Preprocessing
-  inputString <- "I want to"
-  inputTerms <- getTerms(inputString, num = 3)
-  inputTerms
-  pBackOff2(inputTerms,fourGramTable,NULL)
+  inputString <- 'am going to'
+  matchIn4Gram <- fourGramTable[firstTerms == getTerms(inputString, num = 3)]
+  if (nrow(matchIn4Gram) > 0){
+    lastTerms <- matchIn4Gram$lastTerm
+    all_freq <- sum(matchIn4Gram$frequency)
+    matchIn4Gram$prob <- with(matchIn4Gram, (frequency * discount)/all_freq)
+    #matchIn4Gram$prob <- apply(matchIn4Gram[,by = c("frequency","discount"),drop=F], 1,
+    #                       function(x) {
+    #                         (strtoi(x[1], base = 0L)*as.numeric(x[5])/all_freq)
+    #                       })
+    LeftOverProb4 <- matchIn4Gram[, .(calcLeftOverProb(lastTerm, gtAdjFreq, discount))]
+  }
+  #matchIn4Gram[order(matchIn4Gram$prob,decreasing=TRUE),]
+  getTerms(inputString,num=2)
+  matchIn3Gram <- threeGramTable[firstTerms == getTerms(inputString, num = 2)]
+  if (nrow(matchIn3Gram) >0) {
+    matchIn3Gram <- subset(matchIn3Gram, !(lastTerm %in% matchIn4Gram$lastTerm))
+    lastTerms <- matchIn3Gram$lastTerm
+    all_freq <- sum(matchIn3Gram$frequency)
+    if(length(matchIn4Gram$frequency)<1) {
+      matchIn3Gram$prob <- with(matchIn3Gram, (frequency * discount)/all_freq)
+      #matchIn3Gram$prob <- apply(matchIn3Gram[,by = c("frequency","discount"),drop=F], 1,
+      #                           function(x) {
+      #                             (strtoi(x[1], base = 0L)*as.numeric(x[5])/all_freq)
+      #                           })
+    } else { 
+       sumFreq_Disc <- sum(matchIn3Gram$frequency*matchIn3Gram$discount)
+       matchIn3Gram$prob <- with(matchIn3Gram, (frequency * discount)*(LeftOverProb4/sumFreq_Disc))
+       #matchIn3Gram$prob <- apply(matchIn3Gram[,by = c("frequency","discount"),drop=F], 1,
+      #                        function(x) {
+      #                          (strtoi(x[1], base = 0L)*as.numeric(x[5]) * 
+      #                             LeftOverProb/sumFreq_Disc)
+      #                        })
+    } 
+    LeftOverProb3 <- matchIn3Gram[, .(calcLeftOverProb(lastTerm, gtAdjFreq, discount))]
+  } 
+  #matchIn3Gram[order(matchIn3Gram$prob,decreasing=TRUE),]
+  LeftOverProb4
+  10*(.9998365/213)
+  matchIn2Gram <- twoGramTable[firstTerms == getTerms(inputString, num = 1)]
+  if (nrow(matchIn2Gram) >0) {
+    matchIn2Gram <- subset(matchIn2Gram, !(lastTerm %in% matchIn3Gram$lastTerm))
+    lastTerms <- matchIn2Gram$lastTerm
+    all_freq <- sum(matchIn2Gram$frequency)
+    if(length(matchIn3Gram$frequency)<1) {
+      matchIn2Gram$prob <- with(matchIn2Gram, (frequency * discount)/all_freq)
+      #matchIn2Gram$prob <- apply(matchIn2Gram[,by = c("frequency","discount"),drop=F], 1,
+      #                           function(x) {
+      #                             (strtoi(x[1], base = 0L)*as.numeric(x[5])/all_freq)
+      #                           })
+    } else { 
+      sumFreq_Disc <- sum(matchIn2Gram$frequency*matchIn2Gram$discount)
+      matchIn2Gram$prob <- with(matchIn2Gram, (frequency * discount)*(LeftOverProb3/sumFreq_Disc))
+      #matchIn2Gram$prob <- apply(matchIn2Gram[,by = c("frequency","discount"),drop=F], 1,
+      #                           function(x) {
+      #                             (strtoi(x[1], base = 0L)*as.numeric(x[5]) * 
+      #                                LeftOverProb/sumFreq_Disc)
+      #                           })
+    } 
+    
+    LeftOverProb2 <- matchIn2Gram[, .(calcLeftOverProb(lastTerm, gtAdjFreq, discount))]
+  }     
   
-}
-
-#pBackOff2 <- function(iTerm,gramtable) {
-  #gramtable <- fourGramTable
-  inputString <- "I want to"
-  iTerm <- getTerms(inputString, num = 3)
-  print(iTerm)
-  matchInGram <- fourGramTable[firstTerms == iTerm]
-  matchInGram
-  if (nrow(matchInGram) > 0){
-    lastTerms <- matchInGram$lastTerm
-    all_freq <- sum(matchInGram$frequency)
-    matchInGram$prob <- apply(matchInGram[,by = c("frequency","discount"),drop=F], 1,
-                           function(x) {
-                             (strtoi(x[1], base = 0L)*as.numeric(x[5])/all_freq)
-                           })
-    matchInGram
-     <- transform(matchInGram,prob = discount*frequency/all_freq)
-    LeftOverProb <- matchInGram[, .(calcLeftOverProb(lastTerm, gtAdjFreq, discount))]
-    matchInGram[order(matchInGram$prob,decreasing=TRUE),]
-    LeftOverProb
-
-  iTerm2 <- getTerms(inputString, num = 2)
-  print(iTerm2)
-  matchInGram2 <- threeGramTable[firstTerms == iTerm2]
-  if (nrow(matchInGram2) >0) {
-    matchInGram2 <- subset(matchInGram2, !(lastTerm %in% matchInGram$lastTerm))
-    matchInGram2 
-    lastTerms <- matchInGram2$lastTerm
-    all_freq <- sum(matchInGram2$frequency)
-    sumFreq_Disc <- sum(matchInGram2$frequency*matchInGram2$discount)
-    matchInGram2$prob <- apply(matchInGram2[,by = c("frequency","discount"),drop=F], 1,
-                              function(x) {
-                                (strtoi(x[1], base = 0L)*as.numeric(x[5]) * 
-                                   LeftOverProb/sumFreq_Disc)
-                              })
-
-    matchInGram
-    matchInGram2[order(matchInGram2$prob,decreasing=TRUE),]
-    
-    LeftOverProb <- matchInGram[, .(calcLeftOverProb(lastTerm, gtAdjFreq, discount))]
-    
+  if (length(matchIn3Gram)<1) {   
+    matchIn2Gram[order(matchIn2Gram$prob,decreasing=TRUE),]
+  } else { 
+    btq <- rbind(matchIn4Gram,matchIn3Gram,matchIn2Gram,fill=TRUE)
+    btq
+    btq[order(btq$prob,decreasing=TRUE)]
   }
-    }
-    #return(matchInGram[order(matchInGram$prob,decreasing=TRUE),])
-  }
-
-
+}  
+  
 calcLeftOverProb <- function(lastTerm, frequency, discount){
   all_freq = sum(frequency)
   return(1-sum((discount*frequency)/all_freq))
