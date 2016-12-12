@@ -1,80 +1,90 @@
-########## Kneser-Ney prepping data sets ##########
+for (k in phrases) {
+  a <- pknPredict(k)
+  print(k)
+  print(a)
+}
 
-KNprep <- function(dt, n) {
-  # Takes a data.table coming from ngramprep() and adds (Mod.) Kneser-Ney-discounting of the freqs
-  #
-  # Args: 
-  #    dt: a data.table as ngramprep() serves it, requires Terms, Nextword and Freq as minimum cols
-  #    n:  the ngram level (one dt per ngram level 1-4) 
-  # Returns:
-  #    dt: The prepared data table now also suitable for Modified Kneser-Ney prediction
-  #        as described by Chen & Goodman (1999)
-  
-  col <- colnames(dt)
-  col <- col[1:n]
-  
-  
-  # Y = N_c / (N_c + 2N_(c+1)), where N_c is the count of ngrams with count==c (for Kneser-Ney)
-  #     Note: This is a simplified calculation of Y using only the two lowest kept freqs.
-  c1 <- min(dt$Freq) # The lowest available Freq
-  c2 <- min(subset(dt, Freq>c1)$Freq) # And the second lowest
-  Y <- nrow(dt[Freq == c1]) / (nrow(dt[Freq == c1]) + 2 * nrow(dt[Freq == c2])) # 1:0.50 2:0.56 3+:0.62  
-  
-  # D = Discounting parameter different for freq==1, freq==2 and freq>=3
-  #     Ref Goodman and Chen (1999)
-  dt[, D := 0]
-  dt[Freq == 1]$D <- 1 - 2 * Y * (nrow(dt[Freq == 2]) / nrow(dt[Freq == 1]))
-  dt[Freq == 2]$D <- 2 - 3 * Y * (nrow(dt[Freq == 3]) / nrow(dt[Freq == 2]))
-  dt[Freq > 2]$D  <- 3 - 4 * Y * (nrow(dt[Freq == 4]) / nrow(dt[Freq == 3]))
-  
-  # Nom = First nominator in P_KN formula ( max{c(w_i-1, w_i)-D, 0} )
-  dt <- dt[, Nom := pmax(Freq-D, 0)]
-  
-  # Denom = Denominator is the count of the preceding word(s) 
-  if(n==1) {
-    dt <- dt[, Denom := sum(Freq)]
-  } else if (n==2) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom = sum(Freq)), by = w1]
-  } else if (n==3) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom = sum(Freq)), by = list(w2, w1)]
-  } else if (n==4) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom = sum(Freq)), by = list(w3, w2, w1)]
+pknPredict <- function(inputString) { 
+#inputString <- ('I want to')
+w1w2 <- getTerms2(inputString, num = 2)
+w1 <- separateTerms(w1w2)$firstTerm
+w2 <-separateTerms(w1w2)$lastTerm
+#The original Kneser-Ney discounting (-ukndiscount) uses one discounting constant for each N-gram order. 
+#These constants are estimated as
+#D = n1 / (n1 + 2*n2)
+
+#absolute discounting   
+d1 <- 0.6
+d2 <- 0.25
+d3 <- 0.15
+
+#Chen and Goodman's modified Kneser-Ney Discounting method
+#http://www.speech.sri.com/projects/srilm/manpages/ngram-discount.7.html
+#	Y   = n1/(n1+2*n2)
+#	D1  = 1 - 2Y(n2/n1) #oneGramTable
+#	D2  = 2 - 3Y(n3/n2) #twoGramTable
+#	D3+ = 3 - 4Y(n4/n3) #threeGramTable
+
+# get the freq of freq of n-gram to get D for smooth
+#http://www.speech.sri.com/projects/srilm/manpages/ngram-discount.7.html
+#  D1 <- nrow(oneGramTable[frequency==1])/
+#    (nrow(oneGramTable[frequency==1])+2*nrow(oneGramTable[frequency==2]))
+#  D2 <- nrow(twoGramTable[frequency==1])/
+#    (nrow(twoGramTable[frequency==1])+2*nrow(twoGramTable[frequency==2]))
+#  D3 <- nrow(threeGramTable[frequency==1])/
+#    (nrow(threeGramTable[frequency==1])+2*nrow(threeGramTable[frequency==2]))
+	
+tricount <- threeGramTable[firstTerms == w1w2]
+bicount <- twoGramTable[firstTerms == w2]
+tw2 <- threeGramTable[grepl(paste0(w2,"$"),threeGramTable$firstTerms)]
+
+lterm <- unique(bicount$lastTerm)
+pkn <- rep(NA,length(lterm))
+
+for (i in 1:length(lterm)) { 
+pkn[i] <- max(tricount[lastTerm==lterm[i]]$frequency-d3,0)/sum(tricount$frequency) + 
+  d3*(nrow(tricount)/sum(tricount$frequency)) *
+  (max(grepl(paste0(w2,"_",lterm[i],'$'),threeGramTable$firstTerms)-d3,0)/nrow(tw2) +
+  d3 *nrow(bicount)/sum(bicount$frequency) * 
+  sum(grepl(lterm[i],twoGramTable$firstTerms))/nrow(twoGramTable))
+}
+
+predictWord <- data.frame(next_word=lterm,probability=pkn,stringsAsFactors=FALSE)
+predictWord <- predictWord[order(predictWord$probability,decreasing = T),]
+return(head(predictWord))
+}
+
+pknUnigram('it would mean the')
+
+pknUnigram <- function(w) {
+  w2 <- getTerms2(w, num = 1)
+  predictTerms <- twoGramTable[firstTerms == w2]$lastTerm
+  bigramcount <- length(predictTerms)
+  pknD <- rep(NA, bigramcount)
+  for (t in 1:length(predictTerms)) {
+    pknD <- nrow(twoGramTable[lastTerm == predictTerms[t]]) / bigramcount
   }
-  
-  
-  # NN = number of word types that follows w_i-1 in the training data
-  if(n==1) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom, NN = length(w))]
-  } else if (n==2) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom, NN = length(w)), by=w1]
-  } else if (n==3) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom, NN = length(w)), by=list(w2, w1)]
-  } else if (n==4) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom, NN = length(w)), by=list(w3, w2, w1)]
-  }
-  
-  
-  # L  = Lambda, normalizing constant, the probability mass we've discounted
-  dt[, L := (D / Freq) * NN]
-  
-  # N = The number of different ngrams this nextword completes in training set 
-  #     (c(w_(i-1)) for Kneser-Ney). Used in P_continutation (PC)
-  if(n==1) {
-    dt <- dt[, .(w, Freq, D, Nom, Denom, NN, L, .N)]
-  } else if (n==2) {
-    dt <- dt[, .(w1, Freq, D, Nom, Denom, NN, L, .N), by=w]
-  } else if (n==3) {
-    dt <- dt[, .(w2, w1, Freq, D, Nom, Denom, NN, L, .N), by=w]
-  } else if (n==4) {
-    dt <- dt[, .(w3, w2, w1, Freq, D, Nom, Denom, NN, L, .N), by=w]
-  }
-  
-  
-  # PC = P_continuation
-  dt[, PC := N / nrow(dt)] # Count of this novel continuation div. by number of unique grams
-  
-  # Prob_KN - Estimated KN probability
-  dt[, P_KN := (Nom/Denom) + ((D/Denom) * NN) * PC]
-  .
-  .
-  .
+  predictWord <- data.frame(next_word=predictTerms,probability=pknD,stringsAsFactors=FALSE)
+  predictWord <- predictWord[order(predictWord$probability,decreasing = T),]
+  return(head(predictWord))
+}
+
+#mapply(function(x,y) (max(x$freqency - d2,0))/subset(y,x$firstTerms %in% y$firstTerms), bicount,l)
+
+getTerms2 = function(inputString, num){
+  # Preprocessing
+   inputString = gsub("[[:space:]]+", " ", str_trim(tolower(inputString)))
+   inputString = gsub("\'+",'',inputString)
+   words = unlist(strsplit(inputString, " "))
+                   
+   if (length(words) < num){
+      stop("Number of Last Terms: Insufficient!")
+   }
+                   
+   from = length(words)-num+1
+   to = length(words)
+                   
+   tempWords = words[from:to]
+   tempWords
+   paste(tempWords, collapse="_")
+}                
